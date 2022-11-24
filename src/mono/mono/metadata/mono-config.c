@@ -46,6 +46,8 @@
 #define CONFIG_OS "haiku"
 #elif defined (TARGET_WASM)
 #define CONFIG_OS "wasm"
+#elif defined(HOST_SERENITYOS)
+#define CONFIG_OS "serenity"
 #else
 #warning Unknown operating system
 #define CONFIG_OS "unknownOS"

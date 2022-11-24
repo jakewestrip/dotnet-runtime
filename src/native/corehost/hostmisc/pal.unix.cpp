@@ -50,6 +50,11 @@
 #error "Don't know how to obtain max path on this platform"
 #endif
 
+// SerenityOS's DynamicLoader doesn't support this flag
+#if defined(TARGET_SERENITY)
+#define RTLD_NOLOAD 0
+#endif
+
 pal::string_t pal::get_timestamp()
 {
     std::time_t t = std::time(nullptr);

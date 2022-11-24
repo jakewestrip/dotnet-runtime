@@ -38,6 +38,8 @@ Error SystemNative_CreateNetworkChangeListenerSocket(intptr_t* retSocket)
 
 #elif HAVE_RT_MSGHDR
     int32_t sock = socket(PF_ROUTE, SOCK_RAW, 0);
+#elif defined(TARGET_SERENITY)
+    int32_t sock = socket(AF_INET, SOCK_RAW, 0);
 #endif
     if (sock == -1)
     {
@@ -168,6 +170,11 @@ Error SystemNative_ReadEvents(intptr_t sock, NetworkChangeEvent onNetworkChange)
                 break;
         }
     }
+    return Error_SUCCESS;
+}
+#elif defined(TARGET_SERENITY)
+Error SystemNative_ReadEvents(intptr_t sock, NetworkChangeEvent onNetworkChange)
+{
     return Error_SUCCESS;
 }
 #else

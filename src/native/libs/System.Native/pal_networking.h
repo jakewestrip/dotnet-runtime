@@ -9,6 +9,10 @@
 #include "pal_errno.h"
 #include <pal_networking_common.h>
 
+#ifdef TARGET_SERENITY
+#include <poll.h>
+#endif
+
 /**
  * These error values are different on every platform so make a
  * platform-agnostic version that we convert to and send to managed
@@ -39,6 +43,16 @@ typedef enum
 /**
  * Error codes from GetHostByName and GetHostByAddr
  */
+#ifdef TARGET_SERENITY
+typedef enum
+{
+    GetHostErrorCodes_HOST_NOT_FOUND = 101,
+    GetHostErrorCodes_TRY_AGAIN = 104,
+    GetHostErrorCodes_NO_RECOVERY = 103,
+    GetHostErrorCodes_NO_DATA = 102,
+    GetHostErrorCodes_NO_ADDRESS = GetHostErrorCodes_NO_DATA
+} GetHostErrorCodes;
+#else
 typedef enum
 {
     GetHostErrorCodes_HOST_NOT_FOUND = 1,
@@ -49,6 +63,7 @@ typedef enum
     GetHostErrorCodes_BAD_ARG = 5,
     GetHostErrorCodes_NO_MEM = 6,
 } GetHostErrorCodes;
+#endif
 
 /**
  * Address families recognized by {Get,Set}AddressFamily.
@@ -293,6 +308,39 @@ typedef struct
     int32_t Events;      // Event flags
     uint32_t Padding;    // Pad out to 8-byte alignment
 } SocketEvent;
+
+#ifdef TARGET_SERENITY
+
+typedef struct pollfd pollfd_t;
+
+typedef struct pollset_watch {
+    int fd;
+    short sigmask;
+    struct pollset_watch* next;
+    struct pollset_watch* prev;
+} pollset_watch_t;
+
+typedef struct pollset {
+    int watchNum;
+    pollset_watch_t* watches_head;
+    int id;
+    struct pollset* next;
+    struct pollset* prev;
+} pollset_t;
+
+typedef struct {
+    short events;
+    int fd;
+} pollset_event_t;
+
+int serenity_pollset_open(void);
+int serenity_pollset_close(int pollsetId);
+int serenity_pollset_add_watch(int pollsetId, int fd, short sigmask);
+int serenity_pollset_remove_watch(int pollsetId, int fd);
+int serenity_pollset_edit_watch(int pollsetId, int fd, short sigmask);
+int serenity_pollset_wait(int pollsetId, pollset_event_t** events);
+
+#endif
 
 PALEXPORT int32_t SystemNative_GetHostEntryForName(const uint8_t* address, int32_t addressFamily, HostEntry* entry);
 

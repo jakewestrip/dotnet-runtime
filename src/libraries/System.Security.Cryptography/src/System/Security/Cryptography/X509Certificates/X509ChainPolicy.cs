@@ -127,7 +127,7 @@ namespace System.Security.Cryptography.X509Certificates
             DisableCertificateDownloads = false;
             _revocationMode = X509RevocationMode.Online;
             _revocationFlag = X509RevocationFlag.ExcludeRoot;
-            _verificationFlags = X509VerificationFlags.NoFlag;
+            _verificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority; // Hack workaround for Serenity's bad openssl
             _trustMode = X509ChainTrustMode.System;
             _verificationTime = DateTime.Now;
             VerificationTimeIgnored = true;

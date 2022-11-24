@@ -120,7 +120,9 @@ struct in_pktinfo
 {
     struct in_addr ipi_addr;
 };
+#ifndef TARGET_SERENITY
 #define IP_PKTINFO IP_RECVDSTADDR
+#endif
 #endif
 
 #if !defined(IPV6_ADD_MEMBERSHIP) && defined(IPV6_JOIN_GROUP)
@@ -605,7 +607,10 @@ int32_t SystemNative_GetDomainName(uint8_t* name, int32_t nameLength)
     assert(name != NULL);
     assert(nameLength > 0);
 
-#if HAVE_GETDOMAINNAME
+#ifdef TARGET_SERENITY
+    size_t namelen = (uint32_t)nameLength;
+    return gethostname((char*)name, nameLength);
+#elif HAVE_GETDOMAINNAME
 #if HAVE_GETDOMAINNAME_SIZET
     size_t namelen = (uint32_t)nameLength;
 #else
@@ -1028,10 +1033,12 @@ SystemNative_TryGetIPPacketInformation(MessageHeader* messageHeader, int32_t isI
         for (; controlMessage != NULL && controlMessage->cmsg_len > 0;
              controlMessage = GET_CMSG_NXTHDR(&header, controlMessage))
         {
+#ifndef TARGET_SERENITY
             if (controlMessage->cmsg_level == IPPROTO_IP && controlMessage->cmsg_type == IP_PKTINFO)
             {
                 return GetIPv4PacketInformation(controlMessage, packetInfo);
             }
+#endif
         }
     }
     else
@@ -1755,9 +1762,11 @@ static bool TryGetPlatformSocketOption(int32_t socketOptionLevel, int32_t socket
                     *optName = IP_OPTIONS;
                     return true;
 
+#ifdef IP_HDRINCL
                 case SocketOptionName_SO_IP_HDRINCL:
                     *optName = IP_HDRINCL;
                     return true;
+#endif
 
                 case SocketOptionName_SO_IP_TOS:
                     *optName = IP_TOS;
@@ -1817,9 +1826,11 @@ static bool TryGetPlatformSocketOption(int32_t socketOptionLevel, int32_t socket
                     return true;
 #endif
 
+#ifdef IP_PKTINFO
                 case SocketOptionName_SO_IP_PKTINFO:
                     *optName = IP_PKTINFO;
                     return true;
+#endif
 
                 default:
                     return false;
@@ -1874,10 +1885,15 @@ static bool TryGetPlatformSocketOption(int32_t socketOptionLevel, int32_t socket
 
                 // case SocketOptionName_SO_TCP_BSDURGENT:
 
+#ifdef IP_UNBLOCK_SOURCE
+#ifdef TCP_KEEPCNT
                 case SocketOptionName_SO_TCP_KEEPALIVE_RETRYCOUNT:
                     *optName = TCP_KEEPCNT;
                     return true;
+#endif
+#endif
 
+#ifdef TCP_KEEPIDLE
                 case SocketOptionName_SO_TCP_KEEPALIVE_TIME:
                     *optName =
                     #if HAVE_TCP_H_TCP_KEEPALIVE
@@ -1886,10 +1902,13 @@ static bool TryGetPlatformSocketOption(int32_t socketOptionLevel, int32_t socket
                         TCP_KEEPIDLE;
                     #endif
                     return true;
+#endif
 
+#ifdef TCP_KEEPINTVL
                 case SocketOptionName_SO_TCP_KEEPALIVE_INTERVAL:
                     *optName = TCP_KEEPINTVL;
                     return true;
+#endif
 
                 default:
                     return false;
@@ -2167,6 +2186,11 @@ SystemNative_SetSockOpt(intptr_t socket, int32_t socketOptionLevel, int32_t sock
     }
 #endif
 
+#ifdef TARGET_SERENITY
+    if (socketOptionLevel != SocketOptionLevel_SOL_SOCKET)
+        return Error_SUCCESS;
+#endif
+
     int optLevel, optName;
     if (!TryGetPlatformSocketOption(socketOptionLevel, socketOptionName, &optLevel, &optName))
     {
@@ -2312,6 +2336,7 @@ static bool TryConvertProtocolTypePalToPlatform(int32_t palAddressFamily, int32_
                     *platformProtocolType = IPPROTO_RAW;
                     return true;
 
+#ifndef TARGET_SERENITY
                 case ProtocolType_PT_DSTOPTS:
                     *platformProtocolType = IPPROTO_DSTOPTS;
                     return true;
@@ -2327,6 +2352,7 @@ static bool TryConvertProtocolTypePalToPlatform(int32_t palAddressFamily, int32_
                 case ProtocolType_PT_FRAGMENT:
                     *platformProtocolType = IPPROTO_FRAGMENT;
                     return true;
+#endif
 
                 default:
                     *platformProtocolType = (int)palProtocolType;
@@ -2434,6 +2460,7 @@ static bool TryConvertProtocolTypePlatformToPal(int32_t palAddressFamily, int pl
                     *palProtocolType = ProtocolType_PT_RAW;
                     return true;
 
+#ifndef TARGET_SERENITY
                 case IPPROTO_DSTOPTS:
                     *palProtocolType = ProtocolType_PT_DSTOPTS;
                     return true;
@@ -2449,6 +2476,7 @@ static bool TryConvertProtocolTypePlatformToPal(int32_t palAddressFamily, int pl
                 case IPPROTO_FRAGMENT:
                     *palProtocolType = ProtocolType_PT_FRAGMENT;
                     return true;
+#endif
 
                 default:
                     *palProtocolType = (int)platformProtocolType;
@@ -2918,6 +2946,379 @@ static int32_t WaitForSocketEventsInner(int32_t port, SocketEvent* buffer, int32
         memset(&buffer[i], 0, sizeof(SocketEvent));
         buffer[i].Data = GetSocketEventData(evt.udata);
         buffer[i].Events = GetSocketEvents(GetKeventFilter(evt.filter), GetKeventFlags(evt.flags));
+    }
+
+    *count = numEvents;
+    return Error_SUCCESS;
+}
+
+#elif TARGET_SERENITY
+
+pollset_t* pollsets_head = NULL;
+pthread_mutex_t pollset_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+int serenity_pollset_open(void)
+{
+    int res = pthread_mutex_lock(&pollset_mutex);
+    if (res == EINVAL)
+    {
+        pthread_mutex_init(&pollset_mutex, NULL);
+        pthread_mutex_lock(&pollset_mutex);
+    }
+
+    int newId = 0;
+    if (pollsets_head == NULL)
+    {
+        pollsets_head = malloc(sizeof(pollset_t));
+        pollsets_head->id = 0;
+        pollsets_head->watchNum = 0;
+        pollsets_head->watches_head = NULL;
+        pollsets_head->next = NULL;
+        pollsets_head->prev = NULL;
+    }else{
+        pollset_t* pollsets_tail = pollsets_head;
+        while(pollsets_tail->next != NULL)
+        {
+            pollsets_tail = pollsets_tail->next;
+        }
+
+        pollset_t* new_pollset = malloc(sizeof(pollset_t));
+        newId = pollsets_tail->id + 1;
+        new_pollset->id = newId;
+        new_pollset->watchNum = 0;
+        new_pollset->watches_head = NULL;
+        new_pollset->prev = pollsets_tail;
+        pollsets_tail->next = new_pollset;
+    }
+
+    pthread_mutex_unlock(&pollset_mutex);
+
+    return newId;
+}
+
+int serenity_pollset_close(int pollsetId)
+{
+    pthread_mutex_lock(&pollset_mutex);
+
+    pollset_t* current = pollsets_head;
+    while (current->id != pollsetId)
+    {
+        if (current->next == NULL)
+        {
+            pthread_mutex_unlock(&pollset_mutex);
+            return -1;
+        }
+        current = current->next;
+    }
+
+    current->prev->next = current->next;
+    current->next->prev = current->prev;
+
+    free(current);
+
+    pthread_mutex_unlock(&pollset_mutex);
+
+    return 0;
+}
+
+pollset_t* serenity_pollset_get(int pollsetId)
+{
+    pollset_t* current = pollsets_head;
+    while (current->id != pollsetId)
+    {
+        if (current->next == NULL)
+        {
+            return NULL;
+        }
+
+        current = current->next;
+    }
+
+    return current;
+}
+
+int serenity_pollset_add_watch(int pollsetId, int fd, short sigmask)
+{
+    pthread_mutex_lock(&pollset_mutex);
+
+    pollset_t* pollset = serenity_pollset_get(pollsetId);
+    if (pollset == NULL)
+    {
+        pthread_mutex_unlock(&pollset_mutex);
+        return -1;
+    }
+
+    if (pollset->watches_head == NULL)
+    {
+        pollset->watches_head = malloc(sizeof(pollset_watch_t));
+        pollset->watches_head->fd = fd;
+        pollset->watches_head->sigmask = sigmask;
+        pollset->watches_head->next = NULL;
+        pollset->watches_head->prev = NULL;
+    }else{
+        pollset_watch_t* watches_tail = pollset->watches_head;
+        while(watches_tail->next != NULL)
+        {
+            watches_tail = watches_tail->next;
+        }
+
+        pollset_watch_t* new_watch = malloc(sizeof(pollset_watch_t));
+        new_watch->fd = fd;
+        new_watch->sigmask = sigmask;
+        new_watch->prev = watches_tail;
+        watches_tail->next = new_watch;
+    }
+
+    pollset->watchNum++;
+
+    pthread_mutex_unlock(&pollset_mutex);
+
+    return 0;
+}
+
+int serenity_pollset_remove_watch(int pollsetId, int fd)
+{
+    pthread_mutex_lock(&pollset_mutex);
+
+    pollset_t* pollset = serenity_pollset_get(pollsetId);
+    if (pollset == NULL)
+    {
+        pthread_mutex_unlock(&pollset_mutex);
+        return -1;
+    }
+
+    pollset_watch_t* current = pollset->watches_head;
+    while (current->fd != fd)
+    {
+        if (current->next == NULL)
+        {
+            pthread_mutex_unlock(&pollset_mutex);
+            return -1;
+        }
+        
+        current = current->next;
+    }
+
+    current->prev->next = current->next;
+    current->next->prev = current->prev;
+
+    free(current);
+
+    pollset->watchNum--;
+
+    pthread_mutex_unlock(&pollset_mutex);
+
+    return 0;
+}
+
+int serenity_pollset_edit_watch(int pollsetId, int fd, short sigmask)
+{
+    pthread_mutex_lock(&pollset_mutex);
+
+    pollset_t* pollset = serenity_pollset_get(pollsetId);
+    if (pollset == NULL)
+    {
+        pthread_mutex_unlock(&pollset_mutex);
+        return -1;
+    }
+
+    pollset_watch_t* current = pollset->watches_head;
+    while (current->fd != fd)
+    {
+        if (current->next == NULL)
+        {
+            pthread_mutex_unlock(&pollset_mutex);
+            return -1;
+        }
+
+        current = current->next;
+    }
+
+    current->sigmask = sigmask;
+
+    pthread_mutex_unlock(&pollset_mutex);
+
+    return 0;
+}
+
+void serenity_pollset_populate_pollfds(pollset_t* pollset, pollfd_t* pollfds)
+{
+    pollset_watch_t* current = pollset->watches_head;
+    for(int i = 0; i < pollset->watchNum; i++)
+    {
+        pollfds[i].fd = current->fd;
+        pollfds[i].events = current->sigmask;
+        pollfds[i].revents = 0;
+    }
+}
+
+int serenity_pollset_wait(int pollsetId, pollset_event_t** events)
+{
+    pthread_mutex_lock(&pollset_mutex);
+
+    pollset_t* pollset = serenity_pollset_get(pollsetId);
+    int watchNum = pollset->watchNum;
+
+    if (watchNum == 0)
+    {
+        pthread_mutex_unlock(&pollset_mutex);
+        usleep(10000);
+        return 0;
+    }
+
+    pollfd_t* pollfds = malloc(sizeof(pollfd_t) * watchNum);
+    serenity_pollset_populate_pollfds(pollset, pollfds);
+
+    int res = poll(pollfds, watchNum, 100);
+    if (res < 0)
+    {
+        pthread_mutex_unlock(&pollset_mutex);
+        return -1;
+    }
+
+    if (res == 0)
+    {
+        pthread_mutex_unlock(&pollset_mutex);
+        return 0;
+    }
+
+    *events = malloc(sizeof(pollset_event_t) * res);
+    
+    int eventNum = 0;
+    for (size_t i = 0; i < watchNum; i++)
+    {
+        if (pollfds[i].revents != 0)
+        {
+            (*events[eventNum]).fd = pollfds[i].fd;
+            (*events[eventNum]).events = pollfds[i].revents;
+            eventNum++;
+        }
+    }
+
+    free(pollfds);
+
+    pthread_mutex_unlock(&pollset_mutex);
+    return res;
+}
+
+static const size_t SocketEventBufferElementSize = sizeof(pollset_event_t) > sizeof(SocketEvent) ? sizeof(pollset_event_t) : sizeof(SocketEvent);
+
+static int GetSocketEvents(short events)
+{
+    int asyncEvents = (((events & POLLIN) != 0) ? SocketEvents_SA_READ : 0) | (((events & POLLOUT) != 0) ? SocketEvents_SA_WRITE : 0) |
+                      (((events & POLLRDHUP) != 0) ? SocketEvents_SA_READCLOSE : 0) |
+                      (((events & POLLHUP) != 0) ? SocketEvents_SA_CLOSE : 0) | (((events & POLLERR) != 0) ? SocketEvents_SA_ERROR : 0);
+
+    return asyncEvents;
+}
+
+static uint32_t GetEPollEvents(SocketEvents events)
+{
+    return (((events & SocketEvents_SA_READ) != 0) ? POLLIN : 0) | (((events & SocketEvents_SA_WRITE) != 0) ? POLLOUT : 0) |
+           (((events & SocketEvents_SA_READCLOSE) != 0) ? POLLRDHUP : 0) | (((events & SocketEvents_SA_CLOSE) != 0) ? POLLHUP : 0) |
+           (((events & SocketEvents_SA_ERROR) != 0) ? POLLERR : 0);
+}
+
+static int32_t CloseSocketEventPortInner(int32_t port)
+{
+    int res = serenity_pollset_close(port);
+
+    if (res == -1)
+    {
+        return Error_ENOSYS;
+    }
+    
+    return Error_SUCCESS;
+}
+
+static int32_t CreateSocketEventPortInner(int32_t* port)
+{
+    int res = serenity_pollset_open();
+
+    if (res == -1)
+    {
+        *port = -1;
+        return Error_ENOSYS;
+    }
+
+    *port = res;
+    return Error_SUCCESS;
+}
+
+static int32_t TryChangeSocketEventRegistrationInner(
+    int32_t port, int32_t socket, SocketEvents currentEvents, SocketEvents newEvents,
+uintptr_t data)
+{
+    assert(currentEvents != newEvents);
+
+    int err = 0;
+    if (currentEvents == SocketEvents_SA_NONE)
+    {
+        short sigmask = (short)GetEPollEvents(newEvents);
+        err = serenity_pollset_add_watch(port, socket, sigmask);
+    }
+    else if (newEvents == SocketEvents_SA_NONE)
+    {
+        err = serenity_pollset_remove_watch(port, socket);
+    }
+
+    if (currentEvents != SocketEvents_SA_NONE)
+    {
+        short sigmask = (short)GetEPollEvents(newEvents);
+        err = serenity_pollset_edit_watch(port, socket, sigmask);
+    }
+
+    if (err != 0)
+    {
+        return SystemNative_ConvertErrorPlatformToPal(errno);
+    }
+
+    return Error_SUCCESS;
+}
+
+static void ConvertEventToSocketAsync(SocketEvent* sae, pollset_event_t* event)
+{
+    assert(sae != NULL);
+    assert(epoll != NULL);
+
+    short events = event->events;
+    if ((events & POLLHUP) != 0)
+    {
+        events = (events & ((uint32_t)~POLLHUP)) | POLLIN | POLLOUT;
+    }
+
+    memset(sae, 0, sizeof(SocketEvent));
+    sae->Data = (uintptr_t)event->fd;
+    sae->Events = GetSocketEvents(events);
+}
+
+static int32_t WaitForSocketEventsInner(int32_t port, SocketEvent* buffer, int32_t* count)
+{
+    assert(buffer != NULL);
+    assert(count != NULL);
+    assert(*count >= 0);
+
+    pollset_event_t* events = NULL;
+    int numEvents;
+
+    numEvents = serenity_pollset_wait(port, &events);
+    while ((numEvents < 0 && errno == EINTR) || (numEvents == 0))
+    {
+        numEvents = serenity_pollset_wait(port, &events);
+    }
+
+    if (numEvents == -1)
+    {
+        *count = 0;
+        return SystemNative_ConvertErrorPlatformToPal(errno);
+    }
+
+    assert(numEvents != 0);
+    assert(numEvents <= *count);
+
+    for (int i = 0; i < numEvents; i++)
+    {
+        ConvertEventToSocketAsync(&buffer[i], &events[i]);
     }
 
     *count = numEvents;

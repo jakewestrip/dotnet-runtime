@@ -63,6 +63,9 @@
 /* Targeting the Fuchsia platform */
 #cmakedefine HOST_FUCHSIA 1
 
+/* Targeting the SerenityOS platform */
+#cmakedefine HOST_SERENITYOS 1
+
 /* Targeting the AIX and PASE platforms */
 #cmakedefine HOST_AIX 1
 
@@ -749,6 +752,9 @@
 
 /* ... */
 #cmakedefine USE_GCC_ATOMIC_OPS 1
+
+/* The JIT/AOT targets SerenityOS */
+#cmakedefine TARGET_SERENITY 1
 
 /* The JIT/AOT targets iOS */
 #cmakedefine TARGET_IOS 1

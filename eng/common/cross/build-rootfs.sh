@@ -9,7 +9,8 @@ usage()
     echo "CodeName - optional, Code name for Linux, can be: xenial(default), zesty, bionic, alpine, alpine3.13 or alpine3.14. If BuildArch is armel, LinuxCodeName is jessie(default) or tizen."
     echo "                              for FreeBSD can be: freebsd12, freebsd13"
     echo "                              for illumos can be: illumos"
-    echo "                                for Haiku can be: haiku."
+    echo "                                for Haiku can be: haiku"
+    echo "                                for SerenityOS can be: serenity."
     echo "lldbx.y - optional, LLDB version, can be: lldb3.9(default), lldb4.0, lldb5.0, lldb6.0 no-lldb. Ignored for alpine and FreeBSD"
     echo "llvmx[.y] - optional, LLVM version for LLVM related packages."
     echo "--skipunmount - optional, will skip the unmount of rootfs folder."
@@ -286,6 +287,11 @@ while :; do
             __BuildArch=x64
             __SkipUnmount=1
             ;;
+        serenity)
+            __CodeName=serenity
+            __BuildArch=x64
+            __SkipUnmount=1
+            ;;
         --skipunmount)
             __SkipUnmount=1
             ;;
@@ -482,6 +488,23 @@ elif [[ "$__CodeName" == "haiku" ]]; then
             rm -rf "$name"
         fi
     done
+elif [[ "$__CodeName" == "serenity" ]]; then
+    JOBS=${MAXJOBS:="$(getconf _NPROCESSORS_ONLN)"}
+
+    echo "Building SerenityOS sysroot for x86_64"
+    mkdir -p "$__RootfsDir"
+    cd "$__RootfsDir"
+    
+    # grab from local for faster dev
+    git clone git@github.com:SerenityOS/serenity.git .
+
+    ./Toolchain/BuildIt.sh
+
+    SERENITY_SOURCE_DIR="$__RootfsDir"
+    export SERENITY_SOURCE_DIR
+
+    Meta/serenity.sh build
+
 elif [[ -n "$__CodeName" ]]; then
     qemu-debootstrap $__Keyring --arch "$__UbuntuArch" "$__CodeName" "$__RootfsDir" "$__UbuntuRepo"
     cp "$__CrossDir/$__BuildArch/sources.list.$__CodeName" "$__RootfsDir/etc/apt/sources.list"

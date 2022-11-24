@@ -29,5 +29,8 @@ size_t mono_get_restricted_memory_limit(void);
 gboolean mono_get_memory_used(size_t *);
 size_t mono_get_memory_avail(void);
 #endif
+#ifdef HOST_SERENITYOS
+guint64 serenityos_get_allocated_pages (void);
+#endif
 
 #endif

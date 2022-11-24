@@ -1461,6 +1461,8 @@ transport_handshake (void)
 	 * results immediately.
 	 */
 	MONO_ENTER_GC_SAFE;
+
+#ifndef TARGET_SERENITY
 	if (conn_fd) {
 		int flag = 1;
 		int result = setsockopt (conn_fd,
@@ -1470,6 +1472,7 @@ transport_handshake (void)
                                  sizeof(int));
 		g_assert (result >= 0);
 	}
+#endif
 
 	set_keepalive ();
 	MONO_EXIT_GC_SAFE;

@@ -95,7 +95,7 @@ suspend_signal_get (void)
 		suspend_signum = mono_threads_suspend_search_alternative_signal ();
 	return suspend_signum;
 #else
-#if defined(__APPLE__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+#if defined(__APPLE__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(HOST_SERENITYOS)
 	return SIGXFSZ;
 #else
 	return SIGPWR;

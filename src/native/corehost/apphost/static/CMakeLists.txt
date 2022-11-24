@@ -130,6 +130,23 @@ if(CLR_CMAKE_TARGET_WIN32)
 
     set(RUNTIMEINFO_LIB runtimeinfo)
 
+elseif(CLR_CMAKE_TARGET_SERENITYOS)
+    # TODO: Get System.Net.Security.Native working (requires gss)
+    set(NATIVE_LIBS
+        coreclr_static
+
+        System.Globalization.Native-Static
+        System.IO.Compression.Native-Static
+        System.Native-Static
+        System.Security.Cryptography.Native.OpenSsl-Static
+
+        palrt
+        coreclrpal
+        eventprovider
+        nativeresourcestring
+    )
+
+    set(RUNTIMEINFO_LIB runtimeinfo)
 else()
     set(NATIVE_LIBS
         coreclr_static

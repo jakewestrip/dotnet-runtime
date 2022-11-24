@@ -47,6 +47,10 @@
 #include <windows.h>
 #endif
 
+#ifdef HOST_SERENITYOS
+#include <stdio.h>
+#endif
+
 #include "memfuncs.h"
 
 #define ptr_mask ((sizeof (void*) - 1))
@@ -242,6 +246,35 @@ mono_gc_memmove_atomic (void *dest, const void *src, size_t size)
 		mono_gc_memmove_aligned (dest, src, size);
 }
 
+#ifdef HOST_SERENITYOS
+guint64
+serenityos_get_allocated_pages (void)
+{
+	uint64_t rc;
+	char* p;
+	char buf[4096];  /* Large enough to hold all of /sys/kernel/memstat. */
+
+	FILE* fp = fopen("/sys/kernel/memstat", "r");
+	if (!fp)
+		return 0;
+
+	fread(buf, 4096, sizeof(char), fp);
+	fclose(fp);
+
+	p = strstr(buf, "physical_allocated\":");
+
+	if (p == NULL)
+		return 0;
+
+	p += strlen("physical_allocated\":");
+
+	rc = 0;
+	sscanf(p, "%" PRIu64, &rc);
+
+	return (guint64)rc;
+}
+#endif
+
 #define _DEFAULT_MEM_SIZE 134217728
 
 guint64
@@ -285,6 +318,10 @@ mono_determine_physical_ram_size (void)
 
 #ifdef _SC_PHYS_PAGES
 	num_pages = (guint64)sysconf (_SC_PHYS_PAGES);
+#endif
+
+#ifdef HOST_SERENITYOS
+	num_pages = serenityos_get_allocated_pages();
 #endif
 
 	if (!page_size || !num_pages) {
@@ -394,6 +431,10 @@ mono_determine_physical_ram_available_size (void)
 
 #ifdef _SC_AVPHYS_PAGES
 	num_pages = (guint64)sysconf (_SC_AVPHYS_PAGES);
+#endif
+
+#ifdef HOST_SERENITYOS
+	num_pages = serenityos_get_allocated_pages();
 #endif
 
 	if (!page_size || !num_pages) {

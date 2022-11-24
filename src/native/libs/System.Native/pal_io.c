@@ -42,6 +42,8 @@
 #include <sys/vfs.h>
 #elif HAVE_STATFS_MOUNT // BSD
 #include <sys/mount.h>
+#elif defined (TARGET_SERENITY)
+#include <sys/statvfs.h>
 #elif !HAVE_NON_LEGACY_STATFS // SunOS
 #include <sys/types.h>
 #include <sys/statvfs.h>
@@ -419,14 +421,14 @@ static void ConvertDirent(const struct dirent* entry, DirectoryEntry* outputEntr
 #endif
 }
 
-#if HAVE_READDIR_R
+#if HAVE_READDIR_R && !defined(TARGET_SERENITY)
 // struct dirent typically contains 64-bit numbers (e.g. d_ino), so we align it at 8-byte.
 static const size_t dirent_alignment = 8;
 #endif
 
 int32_t SystemNative_GetReadDirRBufferSize(void)
 {
-#if HAVE_READDIR_R
+#if HAVE_READDIR_R && !defined(TARGET_SERENITY)
     // dirent should be under 2k in size
     assert(sizeof(struct dirent) < 2048);
     // add some extra space so we can align the buffer to dirent.
@@ -446,7 +448,7 @@ int32_t SystemNative_ReadDirR(DIR* dir, uint8_t* buffer, int32_t bufferSize, Dir
     assert(dir != NULL);
     assert(outputEntry != NULL);
 
-#if HAVE_READDIR_R
+#if HAVE_READDIR_R && !defined(TARGET_SERENITY)
     assert(buffer != NULL);
 
     // align to dirent

@@ -470,6 +470,10 @@ static clockid_t sampling_clock;
 static void
 clock_init_for_profiler (MonoProfilerSampleMode mode)
 {
+#ifdef HOST_SERENITYOS
+	sampling_clock = CLOCK_MONOTONIC;
+}
+#else
 	switch (mode) {
 	case MONO_PROFILER_SAMPLE_MODE_PROCESS: {
 	/*
@@ -497,6 +501,7 @@ clock_init_for_profiler (MonoProfilerSampleMode mode)
 	default: g_assert_not_reached (); break;
 	}
 }
+#endif
 
 static void
 clock_sleep_ns_abs (guint64 ns_abs)

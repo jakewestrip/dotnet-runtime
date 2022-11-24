@@ -194,6 +194,15 @@ typedef enum
 /**
  * Constants from sys/file.h for lock types
  */
+#ifdef TARGET_SERENITY
+typedef enum
+{
+    PAL_LOCK_SH = 0, /* shared lock */
+    PAL_LOCK_EX = 1, /* exclusive lock */
+    PAL_LOCK_NB = (1 << 2), /* don't block when locking*/
+    PAL_LOCK_UN = 2, /* unlock */
+} LockOperations;
+#else
 typedef enum
 {
     PAL_LOCK_SH = 1, /* shared lock */
@@ -201,6 +210,7 @@ typedef enum
     PAL_LOCK_NB = 4, /* don't block when locking*/
     PAL_LOCK_UN = 8, /* unlock */
 } LockOperations;
+#endif
 
 /**
  * Constants for changing the access permissions of a path

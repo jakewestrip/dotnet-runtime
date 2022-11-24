@@ -16,6 +16,9 @@ elseif(EXISTS ${CROSS_ROOTFS}/usr/platform/i86pc)
   set(ILLUMOS 1)
 elseif(EXISTS ${CROSS_ROOTFS}/boot/system/develop/headers/config/HaikuConfig.h)
   set(CMAKE_SYSTEM_NAME Haiku)
+elseif(EXISTS ${CROSS_ROOTFS}/Meta/serenity.sh)
+  set(CMAKE_SYSTEM_NAME SerenityOS)
+  set(SERENITYOS 1)
 else()
   set(CMAKE_SYSTEM_NAME Linux)
   set(LINUX 1)
@@ -87,6 +90,8 @@ elseif(TARGET_ARCH_NAME STREQUAL "x64")
     set(TOOLCHAIN "x86_64-illumos")
   elseif(HAIKU)
     set(TOOLCHAIN "x64_64-unknown-haiku")
+  elseif(SERENITYOS)
+    set(TOOLCHAIN "x86_64-pc-serenity")
   endif()
 elseif(TARGET_ARCH_NAME STREQUAL "x86")
   set(CMAKE_SYSTEM_PROCESSOR i686)
@@ -216,6 +221,64 @@ elseif(HAIKU)
 
     # let CMake set up the correct search paths
     include(Platform/Haiku)
+elseif(SERENITYOS)
+    set(CMAKE_SYSROOT "${CROSS_ROOTFS}/Build/x86_64/Root")
+
+    set(TOOLSET_PREFIX ${TOOLCHAIN}-)
+    function(locate_toolchain_exec exec var)
+        string(TOUPPER ${exec} EXEC_UPPERCASE)
+        if(NOT "$ENV{CLR_${EXEC_UPPERCASE}}" STREQUAL "")
+            set(${var} "$ENV{CLR_${EXEC_UPPERCASE}}" PARENT_SCOPE)
+            return()
+        endif()
+
+        set(SEARCH_PATH "${CROSS_ROOTFS}/Toolchain/bin")
+
+        find_program(EXEC_LOCATION_${exec}
+            PATHS ${SEARCH_PATH}
+            NAMES
+            "${TOOLSET_PREFIX}${exec}${CLR_CMAKE_COMPILER_FILE_NAME_VERSION}"
+            "${TOOLSET_PREFIX}${exec}")
+
+        if (EXEC_LOCATION_${exec} STREQUAL "EXEC_LOCATION_${exec}-NOTFOUND")
+            message(FATAL_ERROR "Unable to find toolchain executable. Name: ${exec}, Prefix: ${TOOLSET_PREFIX}.")
+        endif()
+        set(${var} ${EXEC_LOCATION_${exec}} PARENT_SCOPE)
+    endfunction()
+
+    set(CMAKE_SYSTEM_PREFIX_PATH "${CROSS_ROOTFS}/Build/x86_64/Root")
+
+    locate_toolchain_exec(gcc CMAKE_C_COMPILER)
+    locate_toolchain_exec(g++ CMAKE_CXX_COMPILER)
+
+    set(CMAKE_C_STANDARD_LIBRARIES "${CMAKE_C_STANDARD_LIBRARIES}")
+    set(CMAKE_CXX_STANDARD_LIBRARIES "${CMAKE_CXX_STANDARD_LIBRARIES}")
+
+    # For some reason we have issues finding dependencies, let's just point at
+    # where Serenity's Ports system puts everything
+    set(ZLIB_INCLUDE_DIR "${CROSS_ROOTFS}/Build/x86_64/Root/usr/local/include")
+    set(ZLIB_LIBRARY_RELEASE "${CROSS_ROOTFS}/Build/x86_64/Root/usr/local/lib/libz.so")
+    set(UCURR_H "${CROSS_ROOTFS}/Build/x86_64/Root/usr/local/include")
+    set(ICUI18N "${CROSS_ROOTFS}/Build/x86_64/Root/usr/local/lib/libicui18n.so")
+    set(ICUUC "${CROSS_ROOTFS}/Build/x86_64/Root/usr/local/lib/libicuuc.so")
+    set(OPENSSL_CRYPTO_LIBRARY "${CROSS_ROOTFS}/Build/x86_64/Root/usr/lib/libcrypto.so")
+    set(OPENSSL_INCLUDE_DIR "${CROSS_ROOTFS}/Build/x86_64/Root/usr/local/include")
+    set(OPENSSL_SSL_LIBRARY "${CROSS_ROOTFS}/Build/x86_64/Root/usr/local/lib/libssl.so")
+
+    # Platform/SerenityOS seems to include a non-existent function, so lets define it
+    function(_cmake_record_install_prefix )
+      set(_CMAKE_SYSTEM_PREFIX_PATH_INSTALL_PREFIX_VALUE "${CMAKE_INSTALL_PREFIX}" PARENT_SCOPE)
+      set(count 0)
+      foreach(value IN LISTS CMAKE_SYSTEM_PREFIX_PATH)
+        if(value STREQUAL CMAKE_INSTALL_PREFIX)
+          math(EXPR count "${count}+1")
+        endif()
+      endforeach()
+      set(_CMAKE_SYSTEM_PREFIX_PATH_INSTALL_PREFIX_COUNT "${count}" PARENT_SCOPE)
+    endfunction()
+
+    # let CMake set up the correct search paths
+    include(Platform/SerenityOS)
 else()
     set(CMAKE_SYSROOT "${CROSS_ROOTFS}")
 
@@ -275,7 +338,7 @@ endif()
 
 # Specify compile options
 
-if((TARGET_ARCH_NAME MATCHES "^(arm|arm64|armel|armv6|ppc64le|riscv64|s390x)$" AND NOT ANDROID AND NOT FREEBSD) OR ILLUMOS OR HAIKU)
+if((TARGET_ARCH_NAME MATCHES "^(arm|arm64|armel|armv6|ppc64le|riscv64|s390x)$" AND NOT ANDROID AND NOT FREEBSD) OR ILLUMOS OR HAIKU OR SERENITYOS)
   set(CMAKE_C_COMPILER_TARGET ${TOOLCHAIN})
   set(CMAKE_CXX_COMPILER_TARGET ${TOOLCHAIN})
   set(CMAKE_ASM_COMPILER_TARGET ${TOOLCHAIN})

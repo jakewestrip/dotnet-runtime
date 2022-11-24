@@ -2328,7 +2328,7 @@ ep_rt_mono_thread_attach_2 (bool background_thread, EventPipeThreadType thread_t
 		// Increase sampling thread priority, accepting failures.
 #ifdef HOST_WIN32
 		SetThreadPriority (GetCurrentThread (), THREAD_PRIORITY_HIGHEST);
-#elif _POSIX_PRIORITY_SCHEDULING
+#elif defined(_POSIX_PRIORITY_SCHEDULING)
 		int policy;
 		int priority;
 		struct sched_param param;

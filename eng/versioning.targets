@@ -83,6 +83,7 @@
   <ItemGroup Condition="'$(IsTestProject)' != 'true'">
     <SupportedPlatform Condition="'$(TargetPlatformIdentifier)' == 'illumos'" Include="illumos" />
     <SupportedPlatform Condition="'$(TargetPlatformIdentifier)' == 'Solaris'" Include="Solaris" />
+    <SupportedPlatform Condition="'$(TargetPlatformIdentifier)' == 'SerenityOS'" Include="SerenityOS" />
     <SupportedPlatform Condition="'$(TargetPlatformIdentifier)' == 'tvOS'" Include="tvOS" />
     <SupportedPlatform Condition="'$(TargetPlatformIdentifier)' != '' and
                                   '$(TargetPlatformIdentifier)' != 'Browser' and

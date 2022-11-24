@@ -31,7 +31,8 @@ usage()
   echo "  --librariesConfiguration (-lc)  Libraries build configuration: Debug or Release."
   echo "                                  [Default: Debug]"
   echo "  --os                            Target operating system: windows, Linux, FreeBSD, OSX, MacCatalyst, tvOS,"
-  echo "                                  tvOSSimulator, iOS, iOSSimulator, Android, Browser, wasi, NetBSD, illumos or Solaris."
+  echo "                                  tvOSSimulator, iOS, iOSSimulator, Android, Browser, wasi, NetBSD, illumos,"
+  echo "                                  Solaris or serenity."
   echo "                                  [Default: Your machine's OS.]"
   echo "  --outputrid <rid>               Optional argument that overrides the target rid name."
   echo "  --projects <value>              Project or solution file(s) to build."
@@ -286,9 +287,11 @@ while [[ $# > 0 ]]; do
           os="illumos" ;;
         solaris)
           os="Solaris" ;;
+        serenity)
+          os="SerenityOS" ;;
         *)
           echo "Unsupported target OS '$2'."
-          echo "The allowed values are windows, Linux, FreeBSD, OSX, MacCatalyst, tvOS, tvOSSimulator, iOS, iOSSimulator, Android, Browser, wasi, illumos and Solaris."
+          echo "The allowed values are windows, Linux, FreeBSD, OSX, MacCatalyst, tvOS, tvOSSimulator, iOS, iOSSimulator, Android, Browser, wasi, illumos, Solaris and serenity."
           exit 1
           ;;
       esac

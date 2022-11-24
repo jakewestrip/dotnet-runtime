@@ -132,6 +132,7 @@ set(utils_common_sources
     mono-threads-openbsd.c
     mono-threads-android.c
     mono-threads-haiku.c
+    mono-threads-serenityos.c
     mono-threads-aix.c
     mono-threads-wasm.h
     mono-threads-wasm.c

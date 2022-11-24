@@ -8,21 +8,24 @@
 #include <sys/types.h>
 
 #if defined(AF_PACKET)
-#if HAVE_NETPACKET_PACKET_H
-#include <netpacket/packet.h>
-#else
-#include <linux/if_packet.h>
-#endif
-#if HAVE_NET_IF_ARP_H
-#include <net/if_arp.h>
-#else
-#include <linux/if_arp.h>
-#endif
+    #if HAVE_NETPACKET_PACKET_H
+        #include <netpacket/packet.h>
+    #else
+        #include <linux/if_packet.h>
+    #endif
+
+    #if HAVE_NET_IF_ARP_H
+        #include <net/if_arp.h>
+    #else
+        #include <linux/if_arp.h>
+    #endif
 #elif defined(AF_LINK)
-#include <net/if_dl.h>
-#include <net/if_types.h>
+    #include <net/if_dl.h>
+    #include <net/if_types.h>
+#elif defined(TARGET_SERENITY)
+    #include <net/if_arp.h>
 #else
-#error System must have AF_PACKET or AF_LINK.
+    #error System must have AF_PACKET or AF_LINK.
 #endif
 
 uint16_t MapHardwareType(uint16_t nativeType)
@@ -112,5 +115,7 @@ uint16_t MapHardwareType(uint16_t nativeType)
         default:
             return NetworkInterfaceType_Unknown;
     }
+#elif defined(TARGET_SERENITY)
+    return NetworkInterfaceType_Ethernet;
 #endif
 }

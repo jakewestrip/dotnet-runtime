@@ -280,7 +280,7 @@ mono_clock_get_time_ns (mono_clock_id_t clk_id)
 
 // TODO: Potentially make this the default?
 // Can we assume clock_gettime exists on all modern POSIX systems? Maybe add a better check for it in configure.ac?
-#elif defined(__linux__) || defined (TARGET_WASM)
+#elif defined(__linux__) || defined (TARGET_WASM) || defined(HOST_SERENITYOS)
 
 void
 mono_clock_init (mono_clock_id_t *clk_id)

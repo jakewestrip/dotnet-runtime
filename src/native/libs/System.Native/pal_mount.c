@@ -12,6 +12,8 @@
 // Check if we should use getmntinfo or /proc/mounts
 #if HAVE_MNTINFO
 #include <sys/mount.h>
+#elif defined (TARGET_SERENITY)
+#include <sys/statvfs.h>
 #else
 #include <sys/statfs.h>
 #if HAVE_SYS_MNTENT_H
@@ -68,6 +70,9 @@ int32_t SystemNative_GetAllMountPoints(MountPointFound onFound, void* context)
     return result;
 }
 
+#elif defined(TARGET_SERENITY)
+    return -1;
+}
 #else
     int result = -1;
     FILE* fp = setmntent("/proc/mounts", MNTOPT_RO);

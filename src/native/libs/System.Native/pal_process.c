@@ -733,12 +733,29 @@ int64_t SystemNative_PathConf(const char* path, PathConfName name)
         case PAL_PC_LINK_MAX:
             confValue = _PC_LINK_MAX;
             break;
+#ifdef TARGET_SERENITY
+        case PAL_PC_MAX_CANON:
+            break;
+        case PAL_PC_MAX_INPUT:
+            break;
+        case PAL_PC_CHOWN_RESTRICTED:
+            break;
+        case PAL_PC_NO_TRUNC:
+            break;
+#else
         case PAL_PC_MAX_CANON:
             confValue = _PC_MAX_CANON;
             break;
         case PAL_PC_MAX_INPUT:
             confValue = _PC_MAX_INPUT;
             break;
+        case PAL_PC_CHOWN_RESTRICTED:
+            confValue = _PC_CHOWN_RESTRICTED;
+            break;
+        case PAL_PC_NO_TRUNC:
+            confValue = _PC_NO_TRUNC;
+            break;
+#endif
         case PAL_PC_NAME_MAX:
             confValue = _PC_NAME_MAX;
             break;
@@ -747,12 +764,6 @@ int64_t SystemNative_PathConf(const char* path, PathConfName name)
             break;
         case PAL_PC_PIPE_BUF:
             confValue = _PC_PIPE_BUF;
-            break;
-        case PAL_PC_CHOWN_RESTRICTED:
-            confValue = _PC_CHOWN_RESTRICTED;
-            break;
-        case PAL_PC_NO_TRUNC:
-            confValue = _PC_NO_TRUNC;
             break;
         case PAL_PC_VDISABLE:
             confValue = _PC_VDISABLE;

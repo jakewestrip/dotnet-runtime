@@ -19,6 +19,9 @@
     #define MALLOC_SIZE(s) malloc_usable_size(s)
 #elif defined(TARGET_SUNOS)
     #define MALLOC_SIZE(s) (*((size_t*)(s)-1))
+#elif defined(TARGET_SERENITY)
+    // SerenityOS provides malloc_size in stdlib.h
+    #define MALLOC_SIZE(s) malloc_size(s)
 #else
     #error "Platform doesn't support malloc_usable_size or malloc_size"
 #endif
